@@ -1,0 +1,9 @@
+category,option,type,default,min,max,comment_summary
+time,baseDayDurationMinutes,int,30,1,1440,Real minutes for world time 0-11999 when seasonal adjustment is not active; with seasonal adjustment only the sum of day and night is used
+time,baseNightDurationMinutes,int,30,1,1440,Real minutes for world time 12000-23999 when seasonal adjustment is not active; with seasonal adjustment only the sum of day and night is used
+seasonal,seasonalAdjustmentEnabled,boolean,true,,,Split the cycle length between day and night by the Serene Seasons year position
+seasonal,summerSolsticeDaylightPercent,double,70.0,50.1,99.0,Daylight percentage at the summer solstice
+seasonal,winterSolsticeDaylightPercent,double,30.0,1.0,49.9,Daylight percentage at the winter solstice
+seasonal,alignSereneSeasonsDay,boolean,true,,,Set the Serene Seasons day length to the cycle length; the Serene Seasons Day Duration setting is replaced while on
+dimensions,controlledDimensions,intlist,0,,,Dimensions whose clock Seasonal Time advances; dimensions sharing the Overworld clock follow the Overworld
+debug,debug,boolean,false,,,Periodic diagnostic log lines

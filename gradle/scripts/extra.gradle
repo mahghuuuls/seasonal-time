@@ -3,3 +3,30 @@
 
 // If you wish to use the default helper methods, uncomment the line below
 // apply from: 'gradle/scripts/helpers.gradle'
+
+// The numbers in src/test/resources/config-defaults.csv are a copy. The authoritative table is kept
+// with the project's design documents, two directories above this repository, because the numbers
+// were agreed before the code existed. This task fails the build when the two files differ, so the
+// copy cannot drift unnoticed. It skips itself when that table is not present, so a clone of this
+// repository alone still builds and tests normally.
+tasks.register('checkConfigDefaultsCopy') {
+    def authorityPath = "${rootDir}/../../documentation/config-defaults.csv"
+    def copyPath = "${rootDir}/src/test/resources/config-defaults.csv"
+    onlyIf { new File(authorityPath).exists() }
+    doLast {
+        def copy = new File(copyPath)
+        if (!copy.exists()) {
+            throw new GradleException("${copyPath} is missing. Copy the authority at ${authorityPath} to it.")
+        }
+        def normalise = { File f -> f.getText('UTF-8').replace('\r\n', '\n') }
+        if (normalise(copy) != normalise(new File(authorityPath))) {
+            throw new GradleException(
+                    "src/test/resources/config-defaults.csv differs from ${authorityPath}. " +
+                    "Copy the authority over it, then rerun.")
+        }
+    }
+}
+
+tasks.named('test') {
+    dependsOn 'checkConfigDefaultsCopy'
+}
