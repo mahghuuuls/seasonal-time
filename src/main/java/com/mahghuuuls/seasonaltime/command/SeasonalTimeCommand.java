@@ -6,6 +6,7 @@ import com.mahghuuuls.seasonaltime.control.ClockRole;
 import com.mahghuuuls.seasonaltime.control.ClockStatus;
 import com.mahghuuuls.seasonaltime.control.ProgressionSwitch;
 import com.mahghuuuls.seasonaltime.control.TimeController;
+import com.mahghuuuls.seasonaltime.season.DayAlignment;
 import net.minecraft.command.CommandBase;
 import net.minecraft.command.CommandException;
 import net.minecraft.command.ICommandSender;
@@ -14,7 +15,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.world.World;
-import net.minecraftforge.fml.common.Loader;
 import net.minecraftforge.server.command.CommandTreeBase;
 
 import java.util.ArrayList;
@@ -34,13 +34,14 @@ public final class SeasonalTimeCommand extends CommandTreeBase {
 
     static final int PERMISSION_LEVEL = 2;
 
-    public SeasonalTimeCommand(SeasonalTimeConfig config, TimeController controller, ProgressionSwitch progression) {
+    public SeasonalTimeCommand(SeasonalTimeConfig config, TimeController controller, ProgressionSwitch progression,
+                               DayAlignment dayAlignment) {
         Supplier<Settings> settings = config::settings;
         addSubcommand(new Get(settings, controller));
-        addSubcommand(new Debug(settings, controller, progression));
+        addSubcommand(new Debug(settings, controller, progression, dayAlignment));
         addSubcommand(new Set(config));
         addSubcommand(new Seasonal(config));
-        addSubcommand(new Reload(config));
+        addSubcommand(new Reload(config, controller));
     }
 
     @Override
@@ -171,8 +172,11 @@ public final class SeasonalTimeCommand extends CommandTreeBase {
 
     private static final class Reload extends Change {
 
-        Reload(SeasonalTimeConfig config) {
+        private final TimeController controller;
+
+        Reload(SeasonalTimeConfig config, TimeController controller) {
             super(config);
+            this.controller = controller;
         }
 
         @Override
@@ -192,6 +196,7 @@ public final class SeasonalTimeCommand extends CommandTreeBase {
             }
             // A changed dimension list is picked up by the controller on its next server tick.
             List<String> warnings = config.load();
+            controller.retrySeasonSource();
             List<String> lines = new ArrayList<String>();
             lines.add("Reloaded the config file" + (warnings.isEmpty() ? "." : " with corrections:"));
             lines.addAll(warnings);
@@ -277,10 +282,13 @@ public final class SeasonalTimeCommand extends CommandTreeBase {
     private static final class Debug extends Sub {
 
         private final ProgressionSwitch progression;
+        private final DayAlignment dayAlignment;
 
-        Debug(Supplier<Settings> settings, TimeController controller, ProgressionSwitch progression) {
+        Debug(Supplier<Settings> settings, TimeController controller, ProgressionSwitch progression,
+              DayAlignment dayAlignment) {
             super(settings, controller);
             this.progression = progression;
+            this.dayAlignment = dayAlignment;
         }
 
         @Override
@@ -301,7 +309,8 @@ public final class SeasonalTimeCommand extends CommandTreeBase {
             World world = sender.getEntityWorld();
             ClockRole role = controller.roleOf(world);
             reply(sender, TimeReport.debug(settings.get(), controller.statusShownIn(world), world.getWorldTime(), role,
-                    Loader.isModLoaded("sereneseasons"), progression.stateFor(role)));
+                    controller.seasonsInstalled(), TimeReport.alignment(settings.get(), dayAlignment),
+                    progression.stateFor(role)));
         }
     }
 }

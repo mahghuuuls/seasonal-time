@@ -1,6 +1,8 @@
 package com.mahghuuuls.seasonaltime.control;
 
 import com.mahghuuuls.seasonaltime.config.Settings;
+import com.mahghuuuls.seasonaltime.season.GuardedSeasonSource;
+import com.mahghuuuls.seasonaltime.season.SeasonReading;
 import com.mahghuuuls.seasonaltime.time.CycleDurations;
 import com.mahghuuuls.seasonaltime.time.TimeStepper;
 import net.minecraft.network.play.server.SPacketTimeUpdate;
@@ -22,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 /**
@@ -55,13 +58,28 @@ public final class TimeController {
     private Settings reportedList;
     // Read by commands, which RCON runs off the server thread.
     private final Map<Integer, ClockStatus> statuses = new ConcurrentHashMap<Integer, ClockStatus>();
-    private Settings durationsFor;
-    private CycleDurations durations;
+    private static final int SEASON_REFRESH_TICKS = 20;
 
-    public TimeController(Supplier<Settings> settings, ProgressionSwitch progression, Logger logger) {
+    private final GuardedSeasonSource seasons;
+    /** Set by a config reload, which RCON may run off the server thread; handled on the next Overworld tick. */
+    private final AtomicBoolean retrySeasons = new AtomicBoolean();
+
+    public TimeController(Supplier<Settings> settings, ProgressionSwitch progression, GuardedSeasonSource seasons,
+                          Logger logger) {
         this.settings = settings;
         this.progression = progression;
+        this.seasons = seasons;
         this.logger = logger;
+    }
+
+    /** A config reload gives a suspended season source another chance (REQ-095), from the next server tick. */
+    public void retrySeasonSource() {
+        retrySeasons.set(true);
+    }
+
+    /** Whether a season mod is installed, for diagnostics. */
+    public boolean seasonsInstalled() {
+        return seasons.installed();
     }
 
     /** The latest status for a dimension's own clock, or null when this controller has not run it. */
@@ -174,6 +192,9 @@ public final class TimeController {
         Settings current = settings.get();
         if (world.provider.getDimension() == ClockOwnership.OVERWORLD) {
             checkListChange(current);
+            if (retrySeasons.getAndSet(false)) {
+                seasons.resume();
+            }
         }
         if (!ClockOwnership.isControlled(world, current)) {
             return;
@@ -188,13 +209,14 @@ public final class TimeController {
             clocks.put(dimension, clock);
         }
         TimeStepper stepper = clock.stepper;
-        CycleDurations durations = durationsFor(current);
+        refreshDurations(world, clock, current);
+        CycleDurations durations = clock.durations;
         if (!progression.isRunning()) {
             // Paused: follow whatever sets the time, so a /time set made now is not reported as an
             // outside change when time resumes. Nothing advances; the status still updates.
             clock.lastWritten = before;
             publish(world, current, new ClockStatus(dimension, before, durations.dayMinutes(),
-                    durations.nightMinutes(), 0.0, stepper.remainder()), true);
+                    durations.nightMinutes(), 0.0, stepper.remainder(), clock.season, clock.seasonalActive), true);
             return;
         }
         if (before != clock.lastWritten) {
@@ -222,7 +244,7 @@ public final class TimeController {
         clock.lastWritten = after;
 
         publish(world, current, new ClockStatus(dimension, after, durations.dayMinutes(), durations.nightMinutes(),
-                durations.unitsPerTick(after), stepper.remainder()), false);
+                durations.unitsPerTick(after), stepper.remainder(), clock.season, clock.seasonalActive), false);
     }
 
     /** Stores the latest status and writes the once-a-minute debug summary. */
@@ -241,19 +263,33 @@ public final class TimeController {
         final TimeStepper stepper = new TimeStepper();
         final LogLimiter outsideChangeLog = new LogLimiter(DEBUG_INTERVAL_TICKS);
         long lastWritten;
+        CycleDurations durations;
+        SeasonReading season = SeasonReading.UNAVAILABLE;
+        boolean seasonalActive;
+        Settings refreshedFor;
+        long nextRefresh;
 
         Clock(long worldTime) {
             this.lastWritten = worldTime;
         }
     }
 
-    /** Rebuilt only when the settings change, which keeps the tick free of that allocation. */
-    private CycleDurations durationsFor(Settings current) {
-        if (current != durationsFor) {
-            durations = CycleDurations.base(current.baseDayDurationMinutes(), current.baseNightDurationMinutes());
-            durationsFor = current;
+    /**
+     * Recomputes this clock's day and night lengths once a second, and at once after a settings
+     * change. The rate uses the current season throughout the day, so the lengths drift slowly with
+     * the year instead of being fixed at sunrise.
+     */
+    private void refreshDurations(World world, Clock clock, Settings current) {
+        long now = world.getTotalWorldTime();
+        if (clock.durations != null && clock.refreshedFor == current && now < clock.nextRefresh) {
+            return;
         }
-        return durations;
+        SeasonReading season = seasons.read(world);
+        clock.durations = SeasonalSplit.durations(current, season);
+        clock.season = season;
+        clock.seasonalActive = SeasonalSplit.active(current, season);
+        clock.refreshedFor = current;
+        clock.nextRefresh = now + SEASON_REFRESH_TICKS;
     }
 
     /** Sends the owner's time to the players of every world that shows this clock. */

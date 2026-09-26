@@ -99,7 +99,8 @@ public final class SeasonalTimeConfig {
                 "Share of the cycle that is daytime at the winter solstice (the middle of Mid Winter).", issued);
         readBoolean(loaded, fileExisted, CATEGORY_SEASONAL, ALIGN_SERENE_SEASONS_DAY, DEFAULT_ALIGN_SERENE_SEASONS_DAY,
                 "With Serene Seasons installed, set its day length to this mod's cycle length so its days match "
-                        + "Minecraft days. While on, the Serene Seasons \"Day Duration\" setting is ignored. Its "
+                        + "Minecraft days. While on, the Serene Seasons \"Day Duration\" setting is replaced, unless "
+                        + "the year would be too long for Serene Seasons to count (then a warning is logged). Its "
                         + "config file is not changed.", issued);
         readDimensions(loaded, fileExisted, issued);
         readBoolean(loaded, fileExisted, CATEGORY_DEBUG, DEBUG, DEFAULT_DEBUG,

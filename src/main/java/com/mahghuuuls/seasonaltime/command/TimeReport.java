@@ -3,6 +3,7 @@ package com.mahghuuuls.seasonaltime.command;
 import com.mahghuuuls.seasonaltime.config.Settings;
 import com.mahghuuuls.seasonaltime.control.ClockRole;
 import com.mahghuuuls.seasonaltime.control.ClockStatus;
+import com.mahghuuuls.seasonaltime.season.DayAlignment;
 import com.mahghuuuls.seasonaltime.time.CycleDurations;
 
 import java.util.ArrayList;
@@ -44,7 +45,7 @@ final class TimeReport {
     static List<String> seasonal(Settings settings, ClockStatus status) {
         List<String> lines = new ArrayList<String>();
         lines.add("Seasonal adjustment enabled: " + settings.seasonalAdjustmentEnabled());
-        lines.add("Seasonal adjustment active: " + NOT_AVAILABLE);
+        lines.add("Seasonal adjustment active: " + seasonalActive(status));
         lines.addAll(solstices(settings));
         lines.add(daylight(status));
         return lines;
@@ -64,7 +65,7 @@ final class TimeReport {
     }
 
     static List<String> debug(Settings settings, ClockStatus status, long worldTime, ClockRole role,
-                              boolean sereneSeasonsInstalled, String progression) {
+                              boolean sereneSeasonsInstalled, String alignment, String progression) {
         List<String> lines = new ArrayList<String>();
         lines.add("World time: " + worldTime);
         lines.add("Time of day: " + CycleDurations.timeOfDay(worldTime));
@@ -73,17 +74,35 @@ final class TimeReport {
         lines.add(night(settings));
         lines.add(cycle(settings));
         lines.addAll(effective(status));
-        lines.add("Season: " + NOT_AVAILABLE);
-        lines.add("Sub-season: " + NOT_AVAILABLE);
-        lines.add("Year position: " + NOT_AVAILABLE);
+        boolean season = status != null && status.season().available();
+        lines.add("Season: " + (season ? status.season().season() : NOT_AVAILABLE));
+        lines.add("Sub-season: " + (season ? status.season().subSeason() : NOT_AVAILABLE));
+        lines.add("Year position: " + (season ? decimal(status.season().yearPosition(), 4) : NOT_AVAILABLE));
         lines.add("Fractional remainder: " + (status == null ? NOT_AVAILABLE : decimal(status.remainder(), 4)));
         lines.add("World time units per tick: " + (status == null ? NOT_AVAILABLE : decimal(status.unitsPerTick(), 4)));
         lines.add("Serene Seasons installed: " + (sereneSeasonsInstalled ? "yes" : "no"));
-        lines.add("Seasonal adjustment active: " + NOT_AVAILABLE);
-        lines.add("Serene Seasons day alignment: " + NOT_AVAILABLE);
+        lines.add("Seasonal adjustment active: " + seasonalActive(status));
+        lines.add(alignment);
         lines.add("Time progression: " + progression);
         lines.add("Controlled dimension: " + role.label());
         return lines;
+    }
+
+    /**
+     * Whether the aligned value is in place on the server, and the Serene Seasons day length in use.
+     * "not applied" means the switch is on but the value could not be set; the log says why.
+     */
+    static String alignment(Settings settings, DayAlignment alignment) {
+        if (!alignment.installed()) {
+            return "Serene Seasons day alignment: " + NOT_AVAILABLE;
+        }
+        String state = alignment.aligned() ? "on" : settings.alignSereneSeasonsDay() ? "not applied" : "off";
+        return "Serene Seasons day alignment: " + state + ", Serene Seasons day length " + alignment.dayTicks()
+                + " ticks";
+    }
+
+    private static String seasonalActive(ClockStatus status) {
+        return status == null ? NOT_AVAILABLE : status.seasonalActive() ? "yes" : "no";
     }
 
     private static String daylight(ClockStatus status) {

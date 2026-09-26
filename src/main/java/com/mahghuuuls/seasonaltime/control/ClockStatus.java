@@ -1,5 +1,6 @@
 package com.mahghuuuls.seasonaltime.control;
 
+import com.mahghuuuls.seasonaltime.season.SeasonReading;
 import com.mahghuuuls.seasonaltime.time.CycleDurations;
 
 import java.util.Locale;
@@ -18,15 +19,29 @@ public final class ClockStatus {
     private final double nightMinutes;
     private final double unitsPerTick;
     private final double remainder;
+    private final SeasonReading season;
+    private final boolean seasonalActive;
 
     public ClockStatus(int dimension, long worldTime, double dayMinutes, double nightMinutes, double unitsPerTick,
-                double remainder) {
+                       double remainder, SeasonReading season, boolean seasonalActive) {
         this.dimension = dimension;
         this.worldTime = worldTime;
         this.dayMinutes = dayMinutes;
         this.nightMinutes = nightMinutes;
         this.unitsPerTick = unitsPerTick;
         this.remainder = remainder;
+        this.season = season;
+        this.seasonalActive = seasonalActive;
+    }
+
+    /** The season this clock read at its last refresh; {@link SeasonReading#UNAVAILABLE} when none. */
+    public SeasonReading season() {
+        return season;
+    }
+
+    /** True when the day and night split comes from the season rather than the base lengths. */
+    public boolean seasonalActive() {
+        return seasonalActive;
     }
 
     public int dimension() {
@@ -72,8 +87,10 @@ public final class ClockStatus {
     public String summary() {
         return String.format(Locale.ROOT,
                 "dim %d: worldTime=%d timeOfDay=%d segment=%s day=%.1fmin night=%.1fmin unitsPerTick=%.4f "
-                        + "remainder=%.4f",
+                        + "remainder=%.4f seasonal=%s%s",
                 dimension, worldTime, timeOfDay(), isDay() ? "DAY" : "NIGHT", dayMinutes, nightMinutes,
-                unitsPerTick, remainder);
+                unitsPerTick, remainder, seasonalActive ? "active" : "inactive",
+                season.available() ? String.format(Locale.ROOT, " daylight=%.2f%% year=%.4f %s",
+                        daylightPercent(), season.yearPosition(), season.subSeason()) : "");
     }
 }

@@ -28,6 +28,15 @@ public final class CycleDurations {
         this.nightMinutes = nightMinutes;
     }
 
+    /**
+     * The cycle length split by a daylight percentage, used while seasonal adjustment is active.
+     * The cycle length stays the same; only the split between day and night changes.
+     */
+    public static CycleDurations seasonal(double cycleMinutes, double daylightPercent) {
+        double day = cycleMinutes * daylightPercent / 100.0;
+        return new CycleDurations(day, cycleMinutes - day);
+    }
+
     /** Day and night exactly as configured, used when seasonal adjustment is not active. */
     public static CycleDurations base(int dayMinutes, int nightMinutes) {
         return new CycleDurations(dayMinutes, nightMinutes);

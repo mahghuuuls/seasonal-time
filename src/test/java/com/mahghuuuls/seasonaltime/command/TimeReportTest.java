@@ -4,6 +4,8 @@ import com.mahghuuuls.seasonaltime.config.SeasonalTimeConfig;
 import com.mahghuuuls.seasonaltime.config.Settings;
 import com.mahghuuuls.seasonaltime.control.ClockRole;
 import com.mahghuuuls.seasonaltime.control.ClockStatus;
+import com.mahghuuuls.seasonaltime.season.DayAlignment;
+import com.mahghuuuls.seasonaltime.season.SeasonReading;
 import net.minecraft.command.CommandBase;
 import net.minecraft.command.ICommand;
 import net.minecraftforge.fml.relauncher.TestMinecraftHome;
@@ -49,7 +51,7 @@ class TimeReportTest {
 
     @Test
     void effectiveUsesTheClockStatusWhenPresent() throws IOException {
-        ClockStatus status = new ClockStatus(0, 6000, 42.0, 18.0, 0.24, 0.5);
+        ClockStatus status = new ClockStatus(0, 6000, 42.0, 18.0, 0.24, 0.5, SeasonReading.of(0.375, "SUMMER", "MID_SUMMER"), true);
         List<String> lines = TimeReport.effective(status);
         assertEquals("Effective day duration: 42.0 minutes", lines.get(0));
         assertEquals("Effective night duration: 18.0 minutes", lines.get(1));
@@ -67,7 +69,7 @@ class TimeReportTest {
     void seasonalShowsSummerAndWinterInTheirOwnLines() throws IOException {
         Settings settings = settings("seasonal {", "    D:summerSolsticeDaylightPercent=80",
                 "    D:winterSolsticeDaylightPercent=40", "}");
-        List<String> lines = TimeReport.seasonal(settings, new ClockStatus(0, 0, 30, 30, 1, 0));
+        List<String> lines = TimeReport.seasonal(settings, new ClockStatus(0, 0, 30, 30, 1, 0, SeasonReading.UNAVAILABLE, false));
         assertEquals("Summer solstice daylight: 80.0%", lines.get(2));
         assertEquals("Winter solstice daylight: 40.0%", lines.get(3));
         assertEquals("Current daylight percentage: 50.0%", lines.get(4));
@@ -75,8 +77,9 @@ class TimeReportTest {
 
     @Test
     void debugPrintsEveryRequiredField() throws IOException {
-        ClockStatus status = new ClockStatus(0, 30500, 30.0, 30.0, 1.0 / 3.0, 0.25);
-        List<String> lines = TimeReport.debug(settings(), status, 30500, ClockRole.CONTROLLED, false, "running");
+        ClockStatus status = new ClockStatus(0, 30500, 30.0, 30.0, 1.0 / 3.0, 0.25, SeasonReading.UNAVAILABLE, false);
+        List<String> lines = TimeReport.debug(settings(), status, 30500, ClockRole.CONTROLLED, false,
+                TimeReport.alignment(settings(), DayAlignment.NONE), "running");
         String[] labels = {"World time: 30500", "Time of day: 6500", "Segment: DAY", "Base day duration",
                 "Base night duration", "Total cycle duration", "Effective day duration", "Effective night duration",
                 "Current daylight percentage", "Season:", "Sub-season:", "Year position:",
@@ -91,18 +94,63 @@ class TimeReportTest {
 
     @Test
     void debugForAnUncontrolledClockStillShowsItsWorldTime() throws IOException {
-        List<String> lines = TimeReport.debug(settings(), null, 18000, ClockRole.NOT_CONTROLLED, true, "paused");
+        List<String> lines = TimeReport.debug(settings(), null, 18000, ClockRole.NOT_CONTROLLED, true,
+                TimeReport.alignment(settings(), aligned(true, 72000)), "paused");
         assertEquals("World time: 18000", lines.get(0));
         assertEquals("Segment: NIGHT", lines.get(2));
         assertEquals("World time units per tick: n/a", lines.get(13));
         assertEquals("Serene Seasons installed: yes", lines.get(14));
+        assertEquals("Serene Seasons day alignment: on, Serene Seasons day length 72000 ticks", lines.get(16));
         assertEquals("Time progression: paused", lines.get(17));
         assertEquals("Controlled dimension: no", lines.get(18));
     }
 
+    /** A Serene Seasons day alignment in a given state. */
+    private static DayAlignment aligned(boolean inPlace, int dayTicks) {
+        return new DayAlignment() {
+            @Override
+            public boolean installed() {
+                return true;
+            }
+
+            @Override
+            public boolean aligned() {
+                return inPlace;
+            }
+
+            @Override
+            public boolean update(int ticks) {
+                return false;
+            }
+
+            @Override
+            public int dayTicks() {
+                return dayTicks;
+            }
+
+            @Override
+            public int ownDayTicks() {
+                return 24000;
+            }
+        };
+    }
+
+    @Test
+    void alignmentShowsTheRealStateAndTheValueInUse() throws IOException {
+        Settings on = settings();
+        assertEquals("Serene Seasons day alignment: n/a", TimeReport.alignment(on, DayAlignment.NONE));
+        assertEquals("Serene Seasons day alignment: on, Serene Seasons day length 72000 ticks",
+                TimeReport.alignment(on, aligned(true, 72000)));
+        assertEquals("Serene Seasons day alignment: not applied, Serene Seasons day length 24000 ticks",
+                TimeReport.alignment(on, aligned(false, 24000)));
+        Settings off = settings("seasonal {", "    B:alignSereneSeasonsDay=false", "}");
+        assertEquals("Serene Seasons day alignment: off, Serene Seasons day length 24000 ticks",
+                TimeReport.alignment(off, aligned(false, 24000)));
+    }
+
     @Test
     void everySubcommandNeedsOperatorLevel() {
-        SeasonalTimeCommand command = new SeasonalTimeCommand(new SeasonalTimeConfig(new File("unused"), message -> { }), null, null);
+        SeasonalTimeCommand command = new SeasonalTimeCommand(new SeasonalTimeConfig(new File("unused"), message -> { }), null, null, null);
         assertEquals(2, command.getRequiredPermissionLevel());
         java.util.Set<String> names = new java.util.TreeSet<String>();
         for (ICommand sub : command.getSubCommands()) {

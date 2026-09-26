@@ -72,7 +72,7 @@ class SeasonalTimeConfigTest {
             assertTrue(text.contains(key), key + " missing from the generated file");
         }
         assertTrue(text.contains("only day + night (the cycle length) is used"), "seasonal ratio comment missing");
-        assertTrue(text.contains("\"Day Duration\" setting is ignored"), "alignment comment missing");
+        assertTrue(text.contains("\"Day Duration\" setting is replaced, unless"), "alignment comment missing");
         assertTrue(text.contains("Whole minutes, 1-1440. Default: 30."), "duration range missing");
         assertTrue(text.contains("Percent, 50.1-99.0. Default: 70.0."), "summer range missing");
         assertTrue(text.contains("Percent, 1.0-49.9. Default: 30.0."), "winter range missing");
