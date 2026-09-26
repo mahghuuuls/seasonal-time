@@ -18,7 +18,8 @@ final class LogLimiter {
 
     /** True when a line may be logged at this total world time; records it as logged. */
     boolean allow(long now) {
-        if (logged && now - lastLoggedAt < intervalTicks) {
+        // A smaller time than the last one means a different world with its own tick count.
+        if (logged && now >= lastLoggedAt && now - lastLoggedAt < intervalTicks) {
             return false;
         }
         logged = true;

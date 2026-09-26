@@ -76,12 +76,12 @@ class TimeReportTest {
     @Test
     void debugPrintsEveryRequiredField() throws IOException {
         ClockStatus status = new ClockStatus(0, 30500, 30.0, 30.0, 1.0 / 3.0, 0.25);
-        List<String> lines = TimeReport.debug(settings(), status, 30500, ClockRole.CONTROLLED, false);
+        List<String> lines = TimeReport.debug(settings(), status, 30500, ClockRole.CONTROLLED, false, "running");
         String[] labels = {"World time: 30500", "Time of day: 6500", "Segment: DAY", "Base day duration",
                 "Base night duration", "Total cycle duration", "Effective day duration", "Effective night duration",
                 "Current daylight percentage", "Season:", "Sub-season:", "Year position:",
                 "Fractional remainder: 0.2500", "World time units per tick: 0.3333", "Serene Seasons installed: no",
-                "Seasonal adjustment active:", "Serene Seasons day alignment:", "Time progression:",
+                "Seasonal adjustment active:", "Serene Seasons day alignment:", "Time progression: running",
                 "Controlled dimension: yes"};
         assertEquals(labels.length, lines.size());
         for (int i = 0; i < labels.length; i++) {
@@ -91,23 +91,25 @@ class TimeReportTest {
 
     @Test
     void debugForAnUncontrolledClockStillShowsItsWorldTime() throws IOException {
-        List<String> lines = TimeReport.debug(settings(), null, 18000, ClockRole.NOT_CONTROLLED, true);
+        List<String> lines = TimeReport.debug(settings(), null, 18000, ClockRole.NOT_CONTROLLED, true, "paused");
         assertEquals("World time: 18000", lines.get(0));
         assertEquals("Segment: NIGHT", lines.get(2));
         assertEquals("World time units per tick: n/a", lines.get(13));
         assertEquals("Serene Seasons installed: yes", lines.get(14));
+        assertEquals("Time progression: paused", lines.get(17));
         assertEquals("Controlled dimension: no", lines.get(18));
     }
 
     @Test
     void everySubcommandNeedsOperatorLevel() {
-        SeasonalTimeCommand command = new SeasonalTimeCommand(null, null);
+        SeasonalTimeCommand command = new SeasonalTimeCommand(new SeasonalTimeConfig(new File("unused"), message -> { }), null, null);
         assertEquals(2, command.getRequiredPermissionLevel());
         java.util.Set<String> names = new java.util.TreeSet<String>();
         for (ICommand sub : command.getSubCommands()) {
             names.add(sub.getName());
         }
-        assertEquals(new java.util.TreeSet<String>(java.util.Arrays.asList("debug", "get")), names);
+        assertEquals(new java.util.TreeSet<String>(java.util.Arrays.asList("debug", "get", "reload", "seasonal", "set")),
+                names);
         for (ICommand sub : command.getSubCommands()) {
             assertEquals(2, ((CommandBase) sub).getRequiredPermissionLevel(), sub.getName());
         }

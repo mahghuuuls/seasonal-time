@@ -13,8 +13,14 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import org.apache.logging.log4j.Logger;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
@@ -43,6 +49,10 @@ public final class TimeController {
     private final ProgressionSwitch progression;
     private final Logger logger;
     private final Map<Integer, Clock> clocks = new HashMap<Integer, Clock>();
+    /** Listed dimensions already reported as following the Overworld, so each is reported once. */
+    private final Set<Integer> reportedFollowers = new HashSet<Integer>();
+    /** The settings whose controlled list was last reported; null until the server has started. */
+    private Settings reportedList;
     // Read by commands, which RCON runs off the server thread.
     private final Map<Integer, ClockStatus> statuses = new ConcurrentHashMap<Integer, ClockStatus>();
     private Settings durationsFor;
@@ -61,10 +71,71 @@ public final class TimeController {
 
     /** How this controller treats the given world's clock. */
     public ClockRole roleOf(World world) {
-        if (ClockOwnership.isControlled(world)) {
-            return ClockRole.CONTROLLED;
+        return ClockOwnership.role(world.provider.getDimension(), ClockOwnership.ownsClock(world), settings.get());
+    }
+
+    /**
+     * Reports the listed dimensions that do not exist, and the loaded listed dimensions that follow
+     * the Overworld. Runs once the server has started, when every dimension is registered.
+     */
+    public void reportDimensions() {
+        reportDimensions(settings.get());
+    }
+
+    /** Reports for exactly these settings, and records them as the last reported list. */
+    private void reportDimensions(Settings reported) {
+        reportedList = reported;
+        for (int dimension : new TreeSet<Integer>(asList(reported.controlledDimensions()))) {
+            if (!DimensionManager.isDimensionRegistered(dimension)) {
+                logger.warn("controlledDimensions lists dimension {}, which does not exist; it is ignored", dimension);
+            }
         }
-        return ClockOwnership.ownsClock(world) ? ClockRole.NOT_CONTROLLED : ClockRole.FOLLOWS_OVERWORLD;
+        for (WorldServer world : DimensionManager.getWorlds()) {
+            reportIfFollower(world, reported);
+        }
+    }
+
+    /**
+     * Notices a changed controlled list on the server thread (a reload may run on the RCON thread),
+     * hands rules back for dimensions that left control, and reports the new list.
+     */
+    private void checkListChange(Settings current) {
+        Settings previous = reportedList;
+        if (previous == null || current == previous) {
+            reportedList = current;
+            return;
+        }
+        if (Arrays.equals(current.controlledDimensions(), previous.controlledDimensions())) {
+            reportedList = current;
+            return;
+        }
+        progression.controlledListChanged(previous, current);
+        reportedFollowers.clear();
+        reportDimensions(current);
+    }
+
+    private static List<Integer> asList(int[] values) {
+        List<Integer> list = new ArrayList<Integer>();
+        for (int value : values) {
+            list.add(value);
+        }
+        return list;
+    }
+
+    @SubscribeEvent
+    public void onWorldLoad(WorldEvent.Load event) {
+        World world = event.getWorld();
+        if (!world.isRemote) {
+            reportIfFollower(world, settings.get());
+        }
+    }
+
+    private void reportIfFollower(World world, Settings current) {
+        if (ClockOwnership.isListedButFollowsOverworld(world, current)
+                && reportedFollowers.add(world.provider.getDimension())) {
+            logger.info("controlledDimensions lists dimension {}, which shares the Overworld clock; it follows the "
+                    + "Overworld and is not advanced separately", world.provider.getDimension());
+        }
     }
 
     /** The status of the clock the given world shows, or null when that clock is not advanced here. */
@@ -80,20 +151,17 @@ public final class TimeController {
     }
 
     @SubscribeEvent
-    public void onWorldLoad(WorldEvent.Load event) {
-        World world = event.getWorld();
-        if (!world.isRemote && ClockOwnership.isControlled(world)) {
-            progression.holdVanillaCycleOff(world, settings.get().debug());
-        }
-    }
-
-    @SubscribeEvent
     public void onWorldUnload(WorldEvent.Unload event) {
         World world = event.getWorld();
         if (!world.isRemote) {
             int dimension = world.provider.getDimension();
             clocks.remove(dimension);
             statuses.remove(dimension);
+            if (dimension == ClockOwnership.OVERWORLD) {
+                // The server is stopping (the Overworld is only unloaded then); the next run reports again.
+                reportedFollowers.clear();
+                reportedList = null;
+            }
         }
     }
 
@@ -103,14 +171,14 @@ public final class TimeController {
             return;
         }
         World world = event.world;
-        if (!ClockOwnership.isControlled(world)) {
-            return;
-        }
         Settings current = settings.get();
-        progression.holdVanillaCycleOff(world, current.debug());
-        if (!progression.isRunning(world)) {
+        if (world.provider.getDimension() == ClockOwnership.OVERWORLD) {
+            checkListChange(current);
+        }
+        if (!ClockOwnership.isControlled(world, current)) {
             return;
         }
+        progression.holdVanillaCycleOff(world);
 
         int dimension = world.provider.getDimension();
         long before = world.getWorldTime();
@@ -120,8 +188,15 @@ public final class TimeController {
             clocks.put(dimension, clock);
         }
         TimeStepper stepper = clock.stepper;
-
         CycleDurations durations = durationsFor(current);
+        if (!progression.isRunning()) {
+            // Paused: follow whatever sets the time, so a /time set made now is not reported as an
+            // outside change when time resumes. Nothing advances; the status still updates.
+            clock.lastWritten = before;
+            publish(world, current, new ClockStatus(dimension, before, durations.dayMinutes(),
+                    durations.nightMinutes(), 0.0, stepper.remainder()), true);
+            return;
+        }
         if (before != clock.lastWritten) {
             stepper.reset();
             if (current.debug() && clock.outsideChangeLog.allow(world.getTotalWorldTime())) {
@@ -146,11 +221,15 @@ public final class TimeController {
         }
         clock.lastWritten = after;
 
-        ClockStatus status = new ClockStatus(dimension, after, durations.dayMinutes(), durations.nightMinutes(),
-                durations.unitsPerTick(after), stepper.remainder());
-        statuses.put(dimension, status);
+        publish(world, current, new ClockStatus(dimension, after, durations.dayMinutes(), durations.nightMinutes(),
+                durations.unitsPerTick(after), stepper.remainder()), false);
+    }
+
+    /** Stores the latest status and writes the once-a-minute debug summary. */
+    private void publish(World world, Settings current, ClockStatus status, boolean paused) {
+        statuses.put(status.dimension(), status);
         if (current.debug() && world.getTotalWorldTime() % DEBUG_INTERVAL_TICKS == 0) {
-            logger.info("[debug] {}", status.summary());
+            logger.info("[debug] {}{}", status.summary(), paused ? " (paused)" : "");
         }
     }
 
@@ -183,7 +262,7 @@ public final class TimeController {
         if (server == null) {
             return;
         }
-        for (WorldServer world : DimensionManager.getWorlds()) {
+        for (WorldServer world : server.worlds) {
             if (ClockOwnership.sharesClockOf(world, owner)) {
                 server.getPlayerList().sendPacketToAllPlayersInDimension(
                         new SPacketTimeUpdate(world.getTotalWorldTime(), world.getWorldTime(), false),

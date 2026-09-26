@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * The text of every read-only {@code /seasonaltime} reply.
+ * The text of every {@code /seasonaltime} reply that shows values.
  *
  * <p>Built from snapshots only ({@link Settings}, {@link ClockStatus}, and the world time the
  * sender sees), so it needs no running game. It only formats: effective values come from the
@@ -42,12 +42,18 @@ final class TimeReport {
     }
 
     static List<String> seasonal(Settings settings, ClockStatus status) {
+        List<String> lines = new ArrayList<String>();
+        lines.add("Seasonal adjustment enabled: " + settings.seasonalAdjustmentEnabled());
+        lines.add("Seasonal adjustment active: " + NOT_AVAILABLE);
+        lines.addAll(solstices(settings));
+        lines.add(daylight(status));
+        return lines;
+    }
+
+    static List<String> solstices(Settings settings) {
         return Arrays.asList(
-                "Seasonal adjustment enabled: " + settings.seasonalAdjustmentEnabled(),
-                "Seasonal adjustment active: " + NOT_AVAILABLE,
                 "Summer solstice daylight: " + percent(settings.summerSolsticeDaylightPercent()),
-                "Winter solstice daylight: " + percent(settings.winterSolsticeDaylightPercent()),
-                daylight(status));
+                "Winter solstice daylight: " + percent(settings.winterSolsticeDaylightPercent()));
     }
 
     static List<String> effective(ClockStatus status) {
@@ -58,7 +64,7 @@ final class TimeReport {
     }
 
     static List<String> debug(Settings settings, ClockStatus status, long worldTime, ClockRole role,
-                              boolean sereneSeasonsInstalled) {
+                              boolean sereneSeasonsInstalled, String progression) {
         List<String> lines = new ArrayList<String>();
         lines.add("World time: " + worldTime);
         lines.add("Time of day: " + CycleDurations.timeOfDay(worldTime));
@@ -75,7 +81,7 @@ final class TimeReport {
         lines.add("Serene Seasons installed: " + (sereneSeasonsInstalled ? "yes" : "no"));
         lines.add("Seasonal adjustment active: " + NOT_AVAILABLE);
         lines.add("Serene Seasons day alignment: " + NOT_AVAILABLE);
-        lines.add("Time progression: " + NOT_AVAILABLE);
+        lines.add("Time progression: " + progression);
         lines.add("Controlled dimension: " + role.label());
         return lines;
     }

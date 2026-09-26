@@ -118,28 +118,51 @@ public final class SeasonalTimeConfig {
         return settings;
     }
 
-    public synchronized void setBaseDayDurationMinutes(int minutes) {
+    synchronized void setBaseDayDurationMinutes(int minutes) {
         requireDuration(minutes, "Day");
         change(CATEGORY_TIME, BASE_DAY).set(minutes);
         publish();
     }
 
-    public synchronized void setBaseNightDurationMinutes(int minutes) {
+    synchronized void setBaseNightDurationMinutes(int minutes) {
         requireDuration(minutes, "Night");
         change(CATEGORY_TIME, BASE_NIGHT).set(minutes);
         publish();
     }
 
-    public synchronized void setSummerSolsticeDaylightPercent(double percent) {
+    synchronized void setSummerSolsticeDaylightPercent(double percent) {
         requirePercent(percent, "Summer solstice daylight percent", MIN_SUMMER_PERCENT, MAX_SUMMER_PERCENT);
         change(CATEGORY_SEASONAL, SUMMER_PERCENT).set(percent);
         publish();
     }
 
-    public synchronized void setWinterSolsticeDaylightPercent(double percent) {
+    synchronized void setWinterSolsticeDaylightPercent(double percent) {
         requirePercent(percent, "Winter solstice daylight percent", MIN_WINTER_PERCENT, MAX_WINTER_PERCENT);
         change(CATEGORY_SEASONAL, WINTER_PERCENT).set(percent);
         publish();
+    }
+
+    /**
+     * Sets base day or night from command text. Anything that is not a whole number in range is
+     * refused with a message naming the range, and nothing changes.
+     */
+    public synchronized void setBaseDayDurationMinutes(String text) {
+        setBaseDayDurationMinutes(parseDuration(text, "Day"));
+    }
+
+    public synchronized void setBaseNightDurationMinutes(String text) {
+        setBaseNightDurationMinutes(parseDuration(text, "Night"));
+    }
+
+    /** Sets a solstice percentage from command text; refused with the range when invalid. */
+    public synchronized void setSummerSolsticeDaylightPercent(String text) {
+        setSummerSolsticeDaylightPercent(parsePercent(text, "Summer solstice daylight percent", MIN_SUMMER_PERCENT,
+                MAX_SUMMER_PERCENT));
+    }
+
+    public synchronized void setWinterSolsticeDaylightPercent(String text) {
+        setWinterSolsticeDaylightPercent(parsePercent(text, "Winter solstice daylight percent", MIN_WINTER_PERCENT,
+                MAX_WINTER_PERCENT));
     }
 
     public synchronized void setSeasonalAdjustmentEnabled(boolean enabled) {
@@ -179,17 +202,43 @@ public final class SeasonalTimeConfig {
         return configuration.getCategory(category).get(key);
     }
 
+    private static int parseDuration(String text, String name) {
+        try {
+            return Integer.parseInt(text.trim());
+        } catch (NumberFormatException notANumber) {
+            throw new IllegalArgumentException(durationRule(name));
+        }
+    }
+
+    private static double parsePercent(String text, String name, double min, double max) {
+        try {
+            return Double.parseDouble(text.trim());
+        } catch (NumberFormatException notANumber) {
+            throw new IllegalArgumentException(percentRule(name, min, max));
+        }
+    }
+
     private static void requireDuration(int minutes, String name) {
         if (minutes < MIN_DURATION_MINUTES || minutes > MAX_DURATION_MINUTES) {
-            throw new IllegalArgumentException(name + " duration must be a whole number of minutes from "
-                    + MIN_DURATION_MINUTES + " to " + MAX_DURATION_MINUTES + ".");
+            throw new IllegalArgumentException(durationRule(name));
         }
     }
 
     private static void requirePercent(double percent, String name, double min, double max) {
         if (!isFinite(percent) || percent < min || percent > max) {
-            throw new IllegalArgumentException(name + " must be from " + format(min) + " to " + format(max) + ".");
+            throw new IllegalArgumentException(percentRule(name, min, max));
         }
+    }
+
+    // These texts are shown through Minecraft's translation lookup, which treats '%' as a
+    // placeholder; keep '%' out of them.
+    private static String durationRule(String name) {
+        return name + " duration must be a whole number of minutes from " + MIN_DURATION_MINUTES + " to "
+                + MAX_DURATION_MINUTES + ".";
+    }
+
+    private static String percentRule(String name, double min, double max) {
+        return name + " must be from " + format(min) + " to " + format(max) + ".";
     }
 
     private void readDuration(Configuration loaded, boolean fileExisted, String key, String comment, List<String> issued) {

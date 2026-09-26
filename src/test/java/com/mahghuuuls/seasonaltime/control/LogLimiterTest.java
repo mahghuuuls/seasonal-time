@@ -22,4 +22,12 @@ class LogLimiterTest {
         assertTrue(limiter.allow(1300));
         assertFalse(limiter.allow(1301));
     }
+
+    @Test
+    void anEarlierTimeFromAnotherWorldIsNotHeldBack() {
+        LogLimiter limiter = new LogLimiter(1200);
+        assertTrue(limiter.allow(50_000));
+        assertTrue(limiter.allow(10));
+        assertFalse(limiter.allow(11));
+    }
 }

@@ -274,6 +274,45 @@ class SeasonalTimeConfigTest {
     }
 
     @Test
+    void commandTextSettersRefuseWithTheRangeAndChangeNothing() throws IOException {
+        SeasonalTimeConfig config = configWith();
+        config.load();
+        IllegalArgumentException text = assertThrows(IllegalArgumentException.class,
+                () -> config.setBaseDayDurationMinutes("abc"));
+        assertTrue(text.getMessage().contains("1 to 1440"), text.getMessage());
+        IllegalArgumentException zero = assertThrows(IllegalArgumentException.class,
+                () -> config.setBaseNightDurationMinutes("0"));
+        assertTrue(zero.getMessage().startsWith("Night") && zero.getMessage().contains("1 to 1440"), zero.getMessage());
+        assertTrue(text.getMessage().startsWith("Day"), text.getMessage());
+        IllegalArgumentException summer = assertThrows(IllegalArgumentException.class,
+                () -> config.setSummerSolsticeDaylightPercent("40"));
+        assertTrue(summer.getMessage().contains("50.1 to 99.0"), summer.getMessage());
+        IllegalArgumentException winter = assertThrows(IllegalArgumentException.class,
+                () -> config.setWinterSolsticeDaylightPercent("warm"));
+        assertTrue(winter.getMessage().contains("1.0 to 49.9"), winter.getMessage());
+        assertEquals(30, config.settings().baseDayDurationMinutes());
+        assertEquals(30, config.settings().baseNightDurationMinutes());
+        assertTrue(fileText().contains("I:baseDayDurationMinutes=30"));
+    }
+
+    @Test
+    void commandTextSettersAcceptValidValues() throws IOException {
+        SeasonalTimeConfig config = configWith();
+        config.load();
+        config.setBaseDayDurationMinutes(" 40 ");
+        config.setBaseNightDurationMinutes("25");
+        config.setSummerSolsticeDaylightPercent(" 75.5 ");
+        config.setWinterSolsticeDaylightPercent("22.5");
+        assertEquals(40, config.settings().baseDayDurationMinutes());
+        assertEquals(25, config.settings().baseNightDurationMinutes());
+        assertEquals(75.5, config.settings().summerSolsticeDaylightPercent());
+        assertEquals(22.5, config.settings().winterSolsticeDaylightPercent());
+        String saved = fileText();
+        assertTrue(saved.contains("I:baseDayDurationMinutes=40") && saved.contains("I:baseNightDurationMinutes=25"),
+                "not saved to the file");
+    }
+
+    @Test
     void reloadReadsEditsMadeOnDisk() throws IOException {
         SeasonalTimeConfig config = configWith();
         config.load();
