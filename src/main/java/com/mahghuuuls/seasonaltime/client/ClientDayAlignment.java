@@ -30,6 +30,11 @@ import org.apache.logging.log4j.Logger;
 public final class ClientDayAlignment implements DayAlignmentReceiver {
 
     private static final int CHECK_INTERVAL_TICKS = 20;
+    /**
+     * Serene Seasons drops its own season message while the joining player does not exist yet and
+     * then counts from Early Spring until its next message, so the season is read 5 seconds in.
+     */
+    private static final int REPORT_DELAY_TICKS = 100;
 
     private Logger logger;
     private DayAlignment alignment = DayAlignment.NONE;
@@ -69,13 +74,12 @@ public final class ClientDayAlignment implements DayAlignmentReceiver {
                         + "setting ({} ticks)", alignment.ownDayTicks());
             }
         }
-        // Serene Seasons sends its own season counter at login too; report the season once both have arrived.
-        reportAt = ticks + CHECK_INTERVAL_TICKS;
+        reportAt = ticks + REPORT_DELAY_TICKS;
     }
 
     @SubscribeEvent
     public void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) {
+        if (event.phase != TickEvent.Phase.END || Minecraft.getMinecraft().player == null) {
             return;
         }
         ticks++;
