@@ -16,6 +16,8 @@ Change the file and run `/seasonaltime reload`, or change a value in game with `
 
 **Vanilla time commands:** `/time set`, `/time add`, `/time query`, and sleeping work as usual; time goes on from the new value. `/gamerule doDaylightCycle false` stops time and `/gamerule doDaylightCycle true` starts it again.
 
+**Shaders:** tested with [OptiFine](https://optifine.net/home) and [BSL Shaders](https://www.curseforge.com/minecraft/shaders/bsl-shaders); the sun, moon, shadows, and sky colors move normally. Other shader packs will likely work too, but were not tested.
+
 **Install:** required on server and client.
 
 **Removing it:** if time stays frozen after removing the mod following a crash, run `/gamerule doDaylightCycle true` once.
