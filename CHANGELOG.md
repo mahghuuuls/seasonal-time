@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.0
+
+### Added
+
+- `solsticeTiming` option: `MIDDLE`, the default, keeps the solstices and equinoxes in the middle of Mid Summer, Mid Winter, Mid Spring, and Mid Autumn, as in 1.0.0. `REALISTIC` moves them two thirds through Early Summer, Early Winter, Early Spring, and Early Autumn, close to the real calendar.
+- `/seasonaltime set solsticeTiming <middle|realistic>`. `/seasonaltime get seasonal` and `/seasonaltime debug` show the timing.
+
+### Changed
+
+- A config file from 1.0.0 gets `solsticeTiming` added as `MIDDLE`, with one warning in the log.
+
 ## 1.0.0
 
 ### Added

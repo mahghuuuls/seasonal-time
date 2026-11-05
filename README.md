@@ -36,10 +36,13 @@ Optional, for [Serene Seasons](https://www.curseforge.com/minecraft/mc-mods/sere
 or later.
 
 - Seasonal adjustment: the share of the cycle that is daytime moves smoothly from
-  `winterSolsticeDaylightPercent` in the middle of Mid Winter, through 50 percent in the middle of
-  Mid Spring and Mid Autumn, to `summerSolsticeDaylightPercent` in the middle of Mid Summer. Day
-  plus night keeps the same total length. Dimensions without Serene Seasons seasons use the base
-  lengths.
+  `winterSolsticeDaylightPercent` at the winter solstice, through 50 percent at the equinoxes, to
+  `summerSolsticeDaylightPercent` at the summer solstice. Day plus night keeps the same total
+  length. Dimensions without Serene Seasons seasons use the base lengths.
+- Solstice timing (`solsticeTiming`): `MIDDLE`, the default, puts the solstices and equinoxes in
+  the middle of Mid Winter, Mid Spring, Mid Summer, and Mid Autumn. `REALISTIC` puts them two thirds
+  through Early Winter, Early Spring, Early Summer, and Early Autumn, which matches the real calendar
+  when spring starts on March 1.
 - Serene Seasons day alignment (`alignSereneSeasonsDay`, on by default): one Serene Seasons day
   lasts one Seasonal Time cycle, on the server and on every player's game, so a sub-season lasts the
   number of Minecraft days set in Serene Seasons. Its `Day Duration` setting is replaced while this
@@ -57,13 +60,15 @@ or later.
 | `baseDayDurationMinutes` | 30 | 1-1440 | Real minutes for daytime without seasonal adjustment |
 | `baseNightDurationMinutes` | 30 | 1-1440 | Real minutes for nighttime without seasonal adjustment |
 | `seasonalAdjustmentEnabled` | true | | Split the cycle by season when Serene Seasons is installed |
-| `summerSolsticeDaylightPercent` | 70.0 | 50.1-99.0 | Daytime share in the middle of Mid Summer |
-| `winterSolsticeDaylightPercent` | 30.0 | 1.0-49.9 | Daytime share in the middle of Mid Winter |
+| `summerSolsticeDaylightPercent` | 70.0 | 50.1-99.0 | Daytime share at the summer solstice |
+| `winterSolsticeDaylightPercent` | 30.0 | 1.0-49.9 | Daytime share at the winter solstice |
+| `solsticeTiming` | MIDDLE | MIDDLE or REALISTIC | Where the solstices and equinoxes fall |
 | `alignSereneSeasonsDay` | true | | Serene Seasons day alignment |
 | `controlledDimensions` | 0 | | Dimension IDs whose own clock is advanced |
 | `debug` | false | | A status line in the log every 60 seconds |
 
-Out-of-range numbers are clamped and unreadable values fall back to the default, each with a warning.
+Out-of-range numbers are clamped, and unreadable values or unknown words fall back to the default,
+each with a warning. A config file from an older version gets new options added with their defaults.
 
 ## Commands
 
@@ -72,6 +77,7 @@ All need operator permission (level 2).
 - `/seasonaltime get [day|night|seasonal|effective]`
 - `/seasonaltime set <day|night> <minutes>`
 - `/seasonaltime set <summerDaylightPercent|winterDaylightPercent> <percent>`
+- `/seasonaltime set solsticeTiming <middle|realistic>`
 - `/seasonaltime seasonal <true|false>`
 - `/seasonaltime reload`
 - `/seasonaltime debug`
