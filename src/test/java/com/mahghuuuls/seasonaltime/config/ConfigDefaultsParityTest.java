@@ -96,6 +96,7 @@ class ConfigDefaultsParityTest {
         values.put(SeasonalTimeConfig.SEASONAL_ADJUSTMENT, String.valueOf(s.seasonalAdjustmentEnabled()));
         values.put(SeasonalTimeConfig.SUMMER_PERCENT, String.valueOf(s.summerSolsticeDaylightPercent()));
         values.put(SeasonalTimeConfig.WINTER_PERCENT, String.valueOf(s.winterSolsticeDaylightPercent()));
+        values.put(SeasonalTimeConfig.SOLSTICE_TIMING, s.solsticeTiming().name());
         values.put(SeasonalTimeConfig.ALIGN_SERENE_SEASONS_DAY, String.valueOf(s.alignSereneSeasonsDay()));
         values.put(SeasonalTimeConfig.CONTROLLED_DIMENSIONS, joinInts(s.controlledDimensions()));
         values.put(SeasonalTimeConfig.DEBUG, String.valueOf(s.debug()));
@@ -166,9 +167,19 @@ class ConfigDefaultsParityTest {
     }
 
     @Test
+    void anUnknownWordForAnEnumGivesTheCsvDefault() throws IOException {
+        for (Map.Entry<String, Row> entry : readCsv().entrySet()) {
+            Row row = entry.getValue();
+            if (row.type.equals("enum")) {
+                assertEquals(row.defaultValue, valueAfterWriting(row, "S", entry.getKey(), "NO_SUCH_WORD"), entry.getKey());
+            }
+        }
+    }
+
+    @Test
     void everyCsvTypeIsHandled() throws IOException {
         for (Row row : readCsv().values()) {
-            assertTrue(Arrays.asList("int", "double", "boolean", "intlist").contains(row.type), row.type);
+            assertTrue(Arrays.asList("int", "double", "boolean", "intlist", "enum").contains(row.type), row.type);
         }
     }
 }

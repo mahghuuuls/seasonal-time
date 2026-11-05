@@ -1,5 +1,6 @@
 package com.mahghuuuls.seasonaltime.config;
 
+import com.mahghuuuls.seasonaltime.time.SolsticeTiming;
 import net.minecraftforge.common.config.ConfigCategory;
 import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.config.Property;
@@ -23,7 +24,9 @@ import java.util.function.Consumer;
  * the range. A value that cannot be read as its type uses the default. An option missing from a
  * file that already existed is added with its default; a first install, where every option is
  * missing, is not reported. Each correction is reported once through the warning sink and written
- * back to the file, so the file always shows what is actually in use.
+ * back to the file, so the file always shows what is actually in use. A word option written in
+ * another case or with extra spaces is the one exception: it is valid, so it is written back in
+ * the usual form without a warning.
  */
 public final class SeasonalTimeConfig {
 
@@ -37,6 +40,7 @@ public final class SeasonalTimeConfig {
     static final String SEASONAL_ADJUSTMENT = "seasonalAdjustmentEnabled";
     static final String SUMMER_PERCENT = "summerSolsticeDaylightPercent";
     static final String WINTER_PERCENT = "winterSolsticeDaylightPercent";
+    static final String SOLSTICE_TIMING = "solsticeTiming";
     static final String ALIGN_SERENE_SEASONS_DAY = "alignSereneSeasonsDay";
     static final String CONTROLLED_DIMENSIONS = "controlledDimensions";
     static final String DEBUG = "debug";
@@ -54,6 +58,7 @@ public final class SeasonalTimeConfig {
     private static final double MAX_WINTER_PERCENT = 49.9;
 
     private static final boolean DEFAULT_SEASONAL_ADJUSTMENT = true;
+    private static final SolsticeTiming DEFAULT_SOLSTICE_TIMING = SolsticeTiming.MIDDLE;
     private static final boolean DEFAULT_ALIGN_SERENE_SEASONS_DAY = true;
     private static final int[] DEFAULT_CONTROLLED_DIMENSIONS = {0};
     private static final boolean DEFAULT_DEBUG = false;
@@ -94,9 +99,12 @@ public final class SeasonalTimeConfig {
                 "With Serene Seasons installed, split the cycle length between day and night by the time of year. "
                         + "Has no effect without Serene Seasons.", issued);
         readPercent(loaded, fileExisted, SUMMER_PERCENT, DEFAULT_SUMMER_PERCENT, MIN_SUMMER_PERCENT, MAX_SUMMER_PERCENT,
-                "Share of the cycle that is daytime at the summer solstice (the middle of Mid Summer).", issued);
+                "Share of the cycle that is daytime at the summer solstice (where it falls is set by " + SOLSTICE_TIMING
+                        + ").", issued);
         readPercent(loaded, fileExisted, WINTER_PERCENT, DEFAULT_WINTER_PERCENT, MIN_WINTER_PERCENT, MAX_WINTER_PERCENT,
-                "Share of the cycle that is daytime at the winter solstice (the middle of Mid Winter).", issued);
+                "Share of the cycle that is daytime at the winter solstice (where it falls is set by " + SOLSTICE_TIMING
+                        + ").", issued);
+        readSolsticeTiming(loaded, fileExisted, issued);
         readBoolean(loaded, fileExisted, CATEGORY_SEASONAL, ALIGN_SERENE_SEASONS_DAY, DEFAULT_ALIGN_SERENE_SEASONS_DAY,
                 "With Serene Seasons installed, set its day length to this mod's cycle length so its days match "
                         + "Minecraft days. While on, the Serene Seasons \"Day Duration\" setting is replaced, unless "
@@ -166,6 +174,16 @@ public final class SeasonalTimeConfig {
                 MAX_WINTER_PERCENT));
     }
 
+    /** Sets the solstice timing from command text, ignoring case; refused with the valid words when unknown. */
+    public synchronized void setSolsticeTiming(String text) {
+        SolsticeTiming timing = SolsticeTiming.fromWord(text);
+        if (timing == null) {
+            throw new IllegalArgumentException("Solstice timing must be " + String.join(" or ", SolsticeTiming.commandWords()) + ".");
+        }
+        change(CATEGORY_SEASONAL, SOLSTICE_TIMING).set(timing.name());
+        publish();
+    }
+
     public synchronized void setSeasonalAdjustmentEnabled(boolean enabled) {
         change(CATEGORY_SEASONAL, SEASONAL_ADJUSTMENT).set(enabled);
         publish();
@@ -187,6 +205,7 @@ public final class SeasonalTimeConfig {
                 value(CATEGORY_SEASONAL, SEASONAL_ADJUSTMENT).getBoolean(),
                 value(CATEGORY_SEASONAL, SUMMER_PERCENT).getDouble(),
                 value(CATEGORY_SEASONAL, WINTER_PERCENT).getDouble(),
+                SolsticeTiming.fromWord(value(CATEGORY_SEASONAL, SOLSTICE_TIMING).getString()),
                 value(CATEGORY_SEASONAL, ALIGN_SERENE_SEASONS_DAY).getBoolean(),
                 value(CATEGORY_DIMENSIONS, CONTROLLED_DIMENSIONS).getIntList(),
                 value(CATEGORY_DEBUG, DEBUG).getBoolean());
@@ -284,6 +303,29 @@ public final class SeasonalTimeConfig {
         }
     }
 
+    private void readSolsticeTiming(Configuration loaded, boolean fileExisted, List<String> issued) {
+        boolean present = readablePresent(loaded, fileExisted, CATEGORY_SEASONAL, SOLSTICE_TIMING, Property.Type.STRING,
+                false, "is not a text option (write it as S:" + SOLSTICE_TIMING + ")", DEFAULT_SOLSTICE_TIMING.name(),
+                issued);
+        Property property = loaded.get(CATEGORY_SEASONAL, SOLSTICE_TIMING, DEFAULT_SOLSTICE_TIMING.name(),
+                "Where the solstices and equinoxes fall in the Serene Seasons year. MIDDLE: in the middle of Mid "
+                        + "Spring, Mid Summer, Mid Autumn, and Mid Winter. REALISTIC: two thirds through Early Spring, "
+                        + "Early Summer, Early Autumn, and Early Winter, close to the real calendar. "
+                        + SolsticeTiming.fileWordsText() + ". Default: " + DEFAULT_SOLSTICE_TIMING.name() + ".");
+        if (!present) {
+            return;
+        }
+        SolsticeTiming timing = SolsticeTiming.fromWord(property.getString());
+        if (timing == null) {
+            warn(issued, CATEGORY_SEASONAL, SOLSTICE_TIMING, property.getString(), "is not " + SolsticeTiming.fileWordsText(),
+                    DEFAULT_SOLSTICE_TIMING.name());
+            property.set(DEFAULT_SOLSTICE_TIMING.name());
+        } else if (!timing.name().equals(property.getString())) {
+            // Another case or spacing of a valid word: written back in the usual form, no warning.
+            property.set(timing.name());
+        }
+    }
+
     private void readBoolean(Configuration loaded, boolean fileExisted, String category, String key, boolean defaultValue,
                              String comment, List<String> issued) {
         readablePresent(loaded, fileExisted, category, key, Property.Type.BOOLEAN, false, "is not true or false",
@@ -329,6 +371,9 @@ public final class SeasonalTimeConfig {
             readable = raw.isIntValue();
         } else if (type == Property.Type.DOUBLE) {
             readable = raw.isDoubleValue();
+        } else if (type == Property.Type.STRING) {
+            // Any text is readable here; the caller judges the word.
+            readable = true;
         } else {
             readable = raw.isBooleanValue();
         }

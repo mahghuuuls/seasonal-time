@@ -70,9 +70,20 @@ class TimeReportTest {
         Settings settings = settings("seasonal {", "    D:summerSolsticeDaylightPercent=80",
                 "    D:winterSolsticeDaylightPercent=40", "}");
         List<String> lines = TimeReport.seasonal(settings, new ClockStatus(0, 0, 30, 30, 1, 0, SeasonReading.UNAVAILABLE, false));
-        assertEquals("Summer solstice daylight: 80.0%", lines.get(2));
-        assertEquals("Winter solstice daylight: 40.0%", lines.get(3));
-        assertEquals("Current daylight percentage: 50.0%", lines.get(4));
+        assertEquals("Solstice timing: MIDDLE", lines.get(2));
+        assertEquals("Summer solstice daylight: 80.0%", lines.get(3));
+        assertEquals("Winter solstice daylight: 40.0%", lines.get(4));
+        assertEquals("Current daylight percentage: 50.0%", lines.get(5));
+    }
+
+    @Test
+    void seasonalShowsARealisticTiming() throws IOException {
+        Settings settings = settings("seasonal {", "    S:solsticeTiming=REALISTIC", "}");
+        ClockStatus status = new ClockStatus(0, 0, 30, 30, 1, 0, SeasonReading.UNAVAILABLE, false);
+        assertEquals("Solstice timing: REALISTIC", TimeReport.seasonal(settings, status).get(2));
+        List<String> debug = TimeReport.debug(settings, status, 0, ClockRole.CONTROLLED, false,
+                TimeReport.alignment(settings, DayAlignment.NONE), "running");
+        assertEquals("Solstice timing: REALISTIC", debug.get(16));
     }
 
     @Test
@@ -84,7 +95,7 @@ class TimeReportTest {
                 "Base night duration", "Total cycle duration", "Effective day duration", "Effective night duration",
                 "Current daylight percentage", "Season:", "Sub-season:", "Year position:",
                 "Fractional remainder: 0.2500", "World time units per tick: 0.3333", "Serene Seasons installed: no",
-                "Seasonal adjustment active:", "Serene Seasons day alignment:", "Time progression: running",
+                "Seasonal adjustment active:", "Solstice timing: MIDDLE", "Serene Seasons day alignment:", "Time progression: running",
                 "Controlled dimension: yes"};
         assertEquals(labels.length, lines.size());
         for (int i = 0; i < labels.length; i++) {
@@ -100,9 +111,10 @@ class TimeReportTest {
         assertEquals("Segment: NIGHT", lines.get(2));
         assertEquals("World time units per tick: n/a", lines.get(13));
         assertEquals("Serene Seasons installed: yes", lines.get(14));
-        assertEquals("Serene Seasons day alignment: on, Serene Seasons day length 72000 ticks", lines.get(16));
-        assertEquals("Time progression: paused", lines.get(17));
-        assertEquals("Controlled dimension: no", lines.get(18));
+        assertEquals("Solstice timing: MIDDLE", lines.get(16));
+        assertEquals("Serene Seasons day alignment: on, Serene Seasons day length 72000 ticks", lines.get(17));
+        assertEquals("Time progression: paused", lines.get(18));
+        assertEquals("Controlled dimension: no", lines.get(19));
     }
 
     /** A Serene Seasons day alignment in a given state. */

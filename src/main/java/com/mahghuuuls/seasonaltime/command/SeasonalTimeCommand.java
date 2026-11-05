@@ -7,6 +7,7 @@ import com.mahghuuuls.seasonaltime.control.ClockStatus;
 import com.mahghuuuls.seasonaltime.control.ProgressionSwitch;
 import com.mahghuuuls.seasonaltime.control.TimeController;
 import com.mahghuuuls.seasonaltime.season.DayAlignment;
+import com.mahghuuuls.seasonaltime.time.SolsticeTiming;
 import net.minecraft.command.CommandBase;
 import net.minecraft.command.CommandException;
 import net.minecraft.command.ICommandSender;
@@ -83,7 +84,8 @@ public final class SeasonalTimeCommand extends CommandTreeBase {
 
     private static final class Set extends Change {
 
-        private static final String[] OPTIONS = {"day", "night", "summerDaylightPercent", "winterDaylightPercent"};
+        private static final String[] OPTIONS = {"day", "night", "summerDaylightPercent", "winterDaylightPercent",
+                "solsticeTiming"};
 
         Set(SeasonalTimeConfig config) {
             super(config);
@@ -96,7 +98,8 @@ public final class SeasonalTimeCommand extends CommandTreeBase {
 
         @Override
         public String getUsage(ICommandSender sender) {
-            return "/seasonaltime set <day|night> <minutes> | set <summerDaylightPercent|winterDaylightPercent> <percent>";
+            return "/seasonaltime set <day|night> <minutes> | set <summerDaylightPercent|winterDaylightPercent> <percent> "
+                    + "| set solsticeTiming <" + String.join("|", SolsticeTiming.commandWords()) + ">";
         }
 
         @Override
@@ -104,19 +107,28 @@ public final class SeasonalTimeCommand extends CommandTreeBase {
             if (args.length != 2) {
                 throw new WrongUsageException(getUsage(sender));
             }
+            List<String> replyLines;
             try {
                 switch (args[0]) {
                     case "day":
                         config.setBaseDayDurationMinutes(args[1]);
+                        replyLines = TimeReport.base(config.settings());
                         break;
                     case "night":
                         config.setBaseNightDurationMinutes(args[1]);
+                        replyLines = TimeReport.base(config.settings());
                         break;
                     case "summerDaylightPercent":
                         config.setSummerSolsticeDaylightPercent(args[1]);
+                        replyLines = TimeReport.solstices(config.settings());
                         break;
                     case "winterDaylightPercent":
                         config.setWinterSolsticeDaylightPercent(args[1]);
+                        replyLines = TimeReport.solstices(config.settings());
+                        break;
+                    case "solsticeTiming":
+                        config.setSolsticeTiming(args[1]);
+                        replyLines = Collections.singletonList(TimeReport.timing(config.settings()));
                         break;
                     default:
                         throw new WrongUsageException(getUsage(sender));
@@ -124,15 +136,19 @@ public final class SeasonalTimeCommand extends CommandTreeBase {
             } catch (IllegalArgumentException refused) {
                 throw new CommandException(refused.getMessage());
             }
-            Settings now = config.settings();
-            reply(sender, args[0].equals("day") || args[0].equals("night")
-                    ? TimeReport.base(now) : TimeReport.solstices(now));
+            reply(sender, replyLines);
         }
 
         @Override
         public List<String> getTabCompletions(MinecraftServer server, ICommandSender sender, String[] args,
                                               BlockPos targetPos) {
-            return args.length == 1 ? getListOfStringsMatchingLastWord(args, OPTIONS) : Collections.<String>emptyList();
+            if (args.length == 1) {
+                return getListOfStringsMatchingLastWord(args, OPTIONS);
+            }
+            if (args.length == 2 && args[0].equals("solsticeTiming")) {
+                return getListOfStringsMatchingLastWord(args, SolsticeTiming.commandWords());
+            }
+            return Collections.<String>emptyList();
         }
     }
 

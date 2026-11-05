@@ -1,6 +1,7 @@
 package com.mahghuuuls.seasonaltime.season;
 
 import com.mahghuuuls.seasonaltime.time.DaylightCurve;
+import com.mahghuuuls.seasonaltime.time.SolsticeTiming;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -13,7 +14,7 @@ class SeasonReadingTest {
     private static final long SERENE_SEASONS_DEFAULT_DAY_TICKS = 24000;
 
     private static double percentAt(long counter, long yearTicks) {
-        return DaylightCurve.daylightPercent(SeasonReading.yearPosition(counter, yearTicks), 70, 30);
+        return DaylightCurve.daylightPercent(SeasonReading.yearPosition(counter, yearTicks), 70, 30, SolsticeTiming.MIDDLE);
     }
 
     @Test

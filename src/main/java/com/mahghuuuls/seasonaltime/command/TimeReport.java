@@ -46,9 +46,14 @@ final class TimeReport {
         List<String> lines = new ArrayList<String>();
         lines.add("Seasonal adjustment enabled: " + settings.seasonalAdjustmentEnabled());
         lines.add("Seasonal adjustment active: " + seasonalActive(status));
+        lines.add(timing(settings));
         lines.addAll(solstices(settings));
         lines.add(daylight(status));
         return lines;
+    }
+
+    static String timing(Settings settings) {
+        return "Solstice timing: " + settings.solsticeTiming().name();
     }
 
     static List<String> solstices(Settings settings) {
@@ -82,6 +87,7 @@ final class TimeReport {
         lines.add("World time units per tick: " + (status == null ? NOT_AVAILABLE : decimal(status.unitsPerTick(), 4)));
         lines.add("Serene Seasons installed: " + (sereneSeasonsInstalled ? "yes" : "no"));
         lines.add("Seasonal adjustment active: " + seasonalActive(status));
+        lines.add(timing(settings));
         lines.add(alignment);
         lines.add("Time progression: " + progression);
         lines.add("Controlled dimension: " + role.label());

@@ -1,5 +1,6 @@
 package com.mahghuuuls.seasonaltime.config;
 
+import com.mahghuuuls.seasonaltime.time.SolsticeTiming;
 import net.minecraftforge.fml.relauncher.TestMinecraftHome;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,7 +69,7 @@ class SeasonalTimeConfigTest {
         String text = fileText();
         for (String key : new String[]{"baseDayDurationMinutes", "baseNightDurationMinutes",
                 "seasonalAdjustmentEnabled", "summerSolsticeDaylightPercent", "winterSolsticeDaylightPercent",
-                "alignSereneSeasonsDay", "controlledDimensions", "debug"}) {
+                "solsticeTiming", "alignSereneSeasonsDay", "controlledDimensions", "debug"}) {
             assertTrue(text.contains(key), key + " missing from the generated file");
         }
         assertTrue(text.contains("only day + night (the cycle length) is used"), "seasonal ratio comment missing");
@@ -77,7 +78,73 @@ class SeasonalTimeConfigTest {
         assertTrue(text.contains("Percent, 50.1-99.0. Default: 70.0."), "summer range missing");
         assertTrue(text.contains("Percent, 1.0-49.9. Default: 30.0."), "winter range missing");
         assertTrue(text.contains("true or false. Default: true."), "boolean default missing");
+        assertTrue(text.contains("S:solsticeTiming=MIDDLE"), "solstice timing default missing");
+        assertTrue(text.contains("MIDDLE or REALISTIC. Default: MIDDLE."), "solstice timing comment missing");
         assertTrue(warnings.isEmpty());
+    }
+
+    @Test
+    void solsticeTimingIsReadWithoutRegardToCase() throws IOException {
+        SeasonalTimeConfig config = configWith("seasonal {", "    S:solsticeTiming= realistic ", "}");
+        config.load();
+        assertEquals(SolsticeTiming.REALISTIC, config.settings().solsticeTiming());
+        assertTrue(problems().isEmpty(), problems().toString());
+        assertTrue(fileText().contains("S:solsticeTiming=REALISTIC"), "word not written back in its usual form");
+    }
+
+    @Test
+    void anUnknownSolsticeTimingUsesMiddleAndWarnsOnce() throws IOException {
+        SeasonalTimeConfig config = configWith("seasonal {", "    S:solsticeTiming=SOUTH", "}");
+        config.load();
+        assertEquals(SolsticeTiming.MIDDLE, config.settings().solsticeTiming());
+        assertEquals(1, problems().size(), problems().toString());
+        assertTrue(problems().get(0).contains("seasonal.solsticeTiming = 'SOUTH' is not MIDDLE or REALISTIC; using MIDDLE"),
+                problems().get(0));
+        warnings.clear();
+        config.load();
+        assertTrue(problems().isEmpty(), "the corrected word must be written back: " + problems());
+    }
+
+    @Test
+    void aSolsticeTimingWithANumberPrefixSaysWhatIsWrong() throws IOException {
+        SeasonalTimeConfig config = configWith("seasonal {", "    D:solsticeTiming=REALISTIC", "}");
+        config.load();
+        assertEquals(SolsticeTiming.MIDDLE, config.settings().solsticeTiming());
+        assertEquals(1, problems().size(), problems().toString());
+        assertTrue(problems().get(0).contains("seasonal.solsticeTiming = 'REALISTIC' is not a text option "
+                + "(write it as S:solsticeTiming); using MIDDLE"), problems().get(0));
+        warnings.clear();
+        config.load();
+        assertTrue(problems().isEmpty(), "the corrected option must be written back: " + problems());
+    }
+
+    @Test
+    void aFileFromVersionOneGetsSolsticeTimingAddedWithOneWarning() throws IOException {
+        SeasonalTimeConfig config = configWith();
+        config.load();
+        String without = fileText().replaceAll("(?m)^\\s*S:solsticeTiming=MIDDLE\\s*$", "");
+        Files.write(new File(directory, "seasonaltime.cfg").toPath(), without.getBytes(StandardCharsets.UTF_8));
+        warnings.clear();
+        config.load();
+        assertEquals(SolsticeTiming.MIDDLE, config.settings().solsticeTiming());
+        assertEquals(1, warnings.size(), warnings.toString());
+        assertTrue(warnings.get(0).contains("seasonal.solsticeTiming is missing; using MIDDLE"), warnings.get(0));
+        assertTrue(fileText().contains("S:solsticeTiming=MIDDLE"), "missing option not written back");
+    }
+
+    @Test
+    void theSolsticeTimingSetterSavesAndPublishesAndRefusesUnknownWords() throws IOException {
+        SeasonalTimeConfig config = configWith();
+        config.load();
+        Settings before = config.settings();
+        config.setSolsticeTiming("Realistic");
+        assertEquals(SolsticeTiming.REALISTIC, config.settings().solsticeTiming());
+        assertTrue(config.settings() != before, "a new snapshot is published");
+        assertTrue(fileText().contains("S:solsticeTiming=REALISTIC"), "not saved");
+        IllegalArgumentException refused = assertThrows(IllegalArgumentException.class, () -> config.setSolsticeTiming("south"));
+        assertEquals("Solstice timing must be middle or realistic.", refused.getMessage());
+        assertEquals(SolsticeTiming.REALISTIC, config.settings().solsticeTiming());
+        assertTrue(fileText().contains("S:solsticeTiming=REALISTIC"), "a refused word must change nothing");
     }
 
     @Test

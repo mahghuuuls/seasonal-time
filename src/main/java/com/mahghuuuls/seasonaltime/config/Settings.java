@@ -1,6 +1,9 @@
 package com.mahghuuuls.seasonaltime.config;
 
+import com.mahghuuuls.seasonaltime.time.SolsticeTiming;
+
 import java.util.Arrays;
+import java.util.Objects;
 
 /**
  * One consistent set of configuration values.
@@ -15,18 +18,20 @@ public final class Settings {
     private final boolean seasonalAdjustmentEnabled;
     private final double summerSolsticeDaylightPercent;
     private final double winterSolsticeDaylightPercent;
+    private final SolsticeTiming solsticeTiming;
     private final boolean alignSereneSeasonsDay;
     private final int[] controlledDimensions;
     private final boolean debug;
 
     Settings(int baseDayDurationMinutes, int baseNightDurationMinutes, boolean seasonalAdjustmentEnabled,
              double summerSolsticeDaylightPercent, double winterSolsticeDaylightPercent,
-             boolean alignSereneSeasonsDay, int[] controlledDimensions, boolean debug) {
+             SolsticeTiming solsticeTiming, boolean alignSereneSeasonsDay, int[] controlledDimensions, boolean debug) {
         this.baseDayDurationMinutes = baseDayDurationMinutes;
         this.baseNightDurationMinutes = baseNightDurationMinutes;
         this.seasonalAdjustmentEnabled = seasonalAdjustmentEnabled;
         this.summerSolsticeDaylightPercent = summerSolsticeDaylightPercent;
         this.winterSolsticeDaylightPercent = winterSolsticeDaylightPercent;
+        this.solsticeTiming = Objects.requireNonNull(solsticeTiming, "solsticeTiming");
         this.alignSereneSeasonsDay = alignSereneSeasonsDay;
         this.controlledDimensions = controlledDimensions.clone();
         this.debug = debug;
@@ -59,6 +64,11 @@ public final class Settings {
         return winterSolsticeDaylightPercent;
     }
 
+    /** Where the solstices and equinoxes fall in the seasonal year. */
+    public SolsticeTiming solsticeTiming() {
+        return solsticeTiming;
+    }
+
     public boolean alignSereneSeasonsDay() {
         return alignSereneSeasonsDay;
     }
@@ -85,7 +95,7 @@ public final class Settings {
     public String toString() {
         return "Settings{day=" + baseDayDurationMinutes + ", night=" + baseNightDurationMinutes
                 + ", seasonal=" + seasonalAdjustmentEnabled + ", summer=" + summerSolsticeDaylightPercent
-                + ", winter=" + winterSolsticeDaylightPercent + ", align=" + alignSereneSeasonsDay
+                + ", winter=" + winterSolsticeDaylightPercent + ", timing=" + solsticeTiming + ", align=" + alignSereneSeasonsDay
                 + ", dimensions=" + Arrays.toString(controlledDimensions) + ", debug=" + debug + "}";
     }
 }

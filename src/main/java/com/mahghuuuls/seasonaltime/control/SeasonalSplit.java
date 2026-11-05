@@ -26,6 +26,6 @@ final class SeasonalSplit {
         }
         return CycleDurations.seasonal(settings.cycleLengthMinutes(), DaylightCurve.daylightPercent(
                 season.yearPosition(), settings.summerSolsticeDaylightPercent(),
-                settings.winterSolsticeDaylightPercent()));
+                settings.winterSolsticeDaylightPercent(), settings.solsticeTiming()));
     }
 }
